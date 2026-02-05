@@ -69,25 +69,35 @@ export function PhotoGallery() {
           ))}
         </div>
 
-        {/* Fullscreen Modal */}
+        {/* Fullscreen Modal - backdrop is tappable so mobile can close by tapping outside */}
         {selectedImage && (
           <div
             className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-2 sm:p-4"
             onClick={() => setSelectedImageId(null)}
+            onTouchEnd={(e) => {
+              if (e.target === e.currentTarget) setSelectedImageId(null);
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Close gallery"
+            onKeyDown={(e) => e.key === 'Escape' && setSelectedImageId(null)}
           >
-            {/* Close Button */}
+            {/* Close Button - large touch target on mobile */}
             <button
-              onClick={() => setSelectedImageId(null)}
-              className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-white/20 hover:bg-white/40 text-white rounded-full p-1.5 sm:p-2 transition-colors"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSelectedImageId(null); }}
+              onTouchEnd={(e) => e.stopPropagation()}
+              className="absolute top-2 sm:top-4 right-2 sm:right-4 min-w-[44px] min-h-[44px] flex items-center justify-center bg-white/20 hover:bg-white/40 active:bg-white/50 text-white rounded-full p-2 sm:p-2.5 transition-colors z-10"
               aria-label="Close fullscreen"
             >
-              <X className="w-5 sm:w-6 h-5 sm:h-6" />
+              <X className="w-6 h-6 sm:w-6 sm:h-6" />
             </button>
 
-            {/* Main Image */}
+            {/* Main Image - only this area blocks close (so backdrop stays tappable) */}
             <div
-              className="relative w-full max-w-4xl h-full max-h-screen flex items-center justify-center"
+              className="relative max-w-4xl max-h-[85vh] w-full flex items-center justify-center flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
             >
               <Image
                 src={selectedImage.src || '/placeholder.svg'}
@@ -126,10 +136,21 @@ export function PhotoGallery() {
               )}
 
               {/* Image Counter */}
-              <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-semibold">
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-semibold pointer-events-none">
                 {currentIndex + 1} / {galleryImages.length}
               </div>
             </div>
+
+            {/* Mobile: large "Close" bar so tap-to-close is obvious */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setSelectedImageId(null); }}
+              onTouchEnd={(e) => e.stopPropagation()}
+              className="sm:hidden mt-3 w-full min-h-[48px] flex items-center justify-center bg-white/20 hover:bg-white/30 active:bg-white/40 text-white font-semibold rounded-xl"
+              aria-label="Close gallery"
+            >
+              Close
+            </button>
           </div>
         )}
       </div>

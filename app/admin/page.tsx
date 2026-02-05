@@ -1,39 +1,56 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { RSVPEntry, rsvpStore } from '@/lib/rsvp-store';
+import { useCallback, useEffect, useState } from 'react';
+import { RSVPEntry } from '@/lib/rsvp-store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
+function computeSummary(rsvps: RSVPEntry[]) {
+  return {
+    totalResponses: rsvps.length,
+    confirmed: rsvps.filter((r) => r.attending === 'yes').length,
+    declined: rsvps.filter((r) => r.attending === 'no').length,
+    maybe: rsvps.filter((r) => r.attending === 'maybe').length,
+    totalGuests: rsvps.reduce((sum, r) => sum + (r.attending === 'yes' ? 1 + r.numberOfGuests : 0), 0),
+  };
+}
+
 export default function AdminPage() {
   const [rsvps, setRsvps] = useState<RSVPEntry[]>([]);
-  const [summary, setSummary] = useState({
-    totalResponses: 0,
-    confirmed: 0,
-    declined: 0,
-    maybe: 0,
-    totalGuests: 0,
-  });
+  const [summary, setSummary] = useState(computeSummary([]));
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Refresh data periodically
-    const interval = setInterval(() => {
-      setRsvps(rsvpStore.getAllRSVPs());
-      setSummary(rsvpStore.getSummary());
-    }, 1000);
-
-    // Initial load
-    setRsvps(rsvpStore.getAllRSVPs());
-    setSummary(rsvpStore.getSummary());
-
-    return () => clearInterval(interval);
+  const fetchRsvps = useCallback(async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/rsvp');
+      if (!res.ok) throw new Error('Failed to load RSVPs');
+      const data = (await res.json()) as RSVPEntry[];
+      setRsvps(Array.isArray(data) ? data : []);
+      setSummary(computeSummary(Array.isArray(data) ? data : []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load RSVPs');
+    }
   }, []);
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this RSVP?')) {
-      rsvpStore.deleteRSVP(id);
-      setRsvps(rsvpStore.getAllRSVPs());
-      setSummary(rsvpStore.getSummary());
+  useEffect(() => {
+    fetchRsvps();
+    const interval = setInterval(fetchRsvps, 3000);
+    return () => clearInterval(interval);
+  }, [fetchRsvps]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this RSVP?')) return;
+    try {
+      const res = await fetch(`/api/rsvp?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      setRsvps((prev) => {
+        const next = prev.filter((r) => r.id !== id);
+        setSummary(computeSummary(next));
+        return next;
+      });
+    } catch {
+      setError('Failed to delete RSVP');
     }
   };
 
@@ -54,6 +71,12 @@ export default function AdminPage() {
     <main className="min-h-screen bg-background p-3 sm:p-6">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-6 sm:mb-8">RSVP Dashboard</h1>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-800 rounded-lg">
+            {error}
+          </div>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-4 mb-6 sm:mb-8">

@@ -5,10 +5,13 @@ import React from "react"
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { rsvpStore } from '@/lib/rsvp-store';
 import { sendRSVPNotification } from '@/lib/emailjs';
 
+const RSVP_DEADLINE = new Date('2026-02-11T23:59:59');
+
 export function RSVPForm() {
+  const isPastDeadline = new Date() > RSVP_DEADLINE;
+
   const [formData, setFormData] = useState({
     guestName: '',
     attending: 'yes',
@@ -42,16 +45,28 @@ export function RSVPForm() {
       setError('Please enter your name');
       return;
     }
+    if (isPastDeadline) {
+      setError('The RSVP deadline has passed.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      rsvpStore.addRSVP({
-        guestName: formData.guestName,
-        attending: formData.attending as 'yes' | 'no' | 'maybe',
-        numberOfGuests: formData.numberOfGuests,
-        additionalGuests: formData.additionalGuests,
-        dietaryRestrictions: formData.dietaryRestrictions,
+      const res = await fetch('/api/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestName: formData.guestName,
+          attending: formData.attending,
+          numberOfGuests: formData.numberOfGuests,
+          additionalGuests: formData.additionalGuests,
+          dietaryRestrictions: formData.dietaryRestrictions,
+        }),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save RSVP');
+      }
 
       await sendRSVPNotification({
         guestName: formData.guestName,
@@ -91,6 +106,9 @@ export function RSVPForm() {
         <p className="text-center text-foreground/70 mb-2 sm:mb-3 text-sm sm:text-lg">
           Let us know if you can make it to the celebration!
         </p>
+        <p className="text-center text-foreground/80 font-semibold mb-2 text-sm sm:text-base">
+          Please RSVP by February 11.
+        </p>
         <div className="flex justify-center gap-2 sm:gap-3 mb-6 sm:mb-10 text-2xl sm:text-3xl">
           🐻 ✨ 🎈
         </div>
@@ -107,7 +125,13 @@ export function RSVPForm() {
           </div>
         )}
 
-        <Card className="p-4 sm:p-8 border-2 sm:border-3 border-primary/30 bg-white/70 backdrop-blur-sm shadow-xl rounded-lg sm:rounded-2xl">
+        {isPastDeadline && (
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-amber-100/90 backdrop-blur-sm border-2 border-amber-500 text-amber-900 rounded-lg sm:rounded-xl font-semibold text-center text-sm sm:text-base">
+            The RSVP deadline (February 11) has passed. Thank you to everyone who responded!
+          </div>
+        )}
+
+        <Card className={`p-4 sm:p-8 border-2 sm:border-3 border-primary/30 bg-white/70 backdrop-blur-sm shadow-xl rounded-lg sm:rounded-2xl ${isPastDeadline ? 'opacity-75' : ''}`}>
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             <div>
               <label className="block text-xs sm:text-sm font-bold text-foreground mb-2">
@@ -204,10 +228,10 @@ export function RSVPForm() {
 
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isPastDeadline}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-200 text-sm sm:text-lg hover:shadow-lg hover:scale-105 disabled:opacity-70 disabled:pointer-events-none"
             >
-              {isSubmitting ? 'Sending…' : 'Submit RSVP'}
+              {isSubmitting ? 'Sending…' : isPastDeadline ? 'RSVP closed' : 'Submit RSVP'}
             </Button>
           </form>
         </Card>
