@@ -17,7 +17,6 @@ export function RSVPForm() {
     attending: 'yes',
     numberOfGuests: 0,
     additionalGuests: '',
-    dietaryRestrictions: '',
   });
 
   const [submitted, setSubmitted] = useState(false);
@@ -60,7 +59,6 @@ export function RSVPForm() {
           attending: formData.attending,
           numberOfGuests: formData.numberOfGuests,
           additionalGuests: formData.additionalGuests,
-          dietaryRestrictions: formData.dietaryRestrictions,
         }),
       });
       if (!res.ok) {
@@ -73,7 +71,6 @@ export function RSVPForm() {
         attending: formData.attending,
         numberOfGuests: formData.numberOfGuests,
         additionalGuests: formData.additionalGuests,
-        dietaryRestrictions: formData.dietaryRestrictions,
       });
 
       setSubmitted(true);
@@ -82,7 +79,6 @@ export function RSVPForm() {
         attending: 'yes',
         numberOfGuests: 0,
         additionalGuests: '',
-        dietaryRestrictions: '',
       });
 
       setTimeout(() => setSubmitted(false), 5000);
@@ -209,20 +205,6 @@ export function RSVPForm() {
                     />
                   </div>
                 )}
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-foreground mb-2">
-                    Dietary restrictions or allergies
-                  </label>
-                  <textarea
-                    name="dietaryRestrictions"
-                    value={formData.dietaryRestrictions}
-                    onChange={handleChange}
-                    placeholder="Please let us know about any dietary restrictions or allergies"
-                    rows={2}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border-2 border-primary/30 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white font-medium text-sm sm:text-base"
-                  />
-                </div>
               </>
             )}
 

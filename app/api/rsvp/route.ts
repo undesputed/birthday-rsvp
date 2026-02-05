@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase-server';
 
 export interface RSVPEntryStored {
   id: string;
@@ -15,7 +16,27 @@ export interface RSVPEntryStored {
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'rsvps.json');
 
-async function readRsvps(): Promise<RSVPEntryStored[]> {
+function rowToEntry(row: {
+  id: string;
+  guest_name: string;
+  attending: string;
+  number_of_guests: number;
+  additional_guests: string | null;
+  dietary_restrictions: string | null;
+  created_at: string;
+}): RSVPEntryStored {
+  return {
+    id: row.id,
+    guestName: row.guest_name,
+    attending: row.attending as 'yes' | 'no' | 'maybe',
+    numberOfGuests: row.number_of_guests ?? 0,
+    additionalGuests: row.additional_guests ?? '',
+    dietaryRestrictions: row.dietary_restrictions ?? '',
+    createdAt: row.created_at,
+  };
+}
+
+async function readRsvpsFile(): Promise<RSVPEntryStored[]> {
   try {
     const raw = await fs.readFile(DATA_FILE, 'utf-8');
     const data = JSON.parse(raw) as { rsvps: RSVPEntryStored[] };
@@ -25,14 +46,26 @@ async function readRsvps(): Promise<RSVPEntryStored[]> {
   }
 }
 
-async function writeRsvps(rsvps: RSVPEntryStored[]): Promise<void> {
+async function writeRsvpsFile(rsvps: RSVPEntryStored[]): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(DATA_FILE, JSON.stringify({ rsvps }, null, 2), 'utf-8');
 }
 
 export async function GET() {
   try {
-    const rsvps = await readRsvps();
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const { data, error } = await supabase
+        .from('rsvps')
+        .select('id, guest_name, attending, number_of_guests, additional_guests, dietary_restrictions, created_at')
+        .order('created_at', { ascending: true });
+      if (error) {
+        console.error('RSVP GET Supabase error:', error);
+        return NextResponse.json({ error: 'Failed to load RSVPs' }, { status: 500 });
+      }
+      return NextResponse.json((data ?? []).map(rowToEntry));
+    }
+    const rsvps = await readRsvpsFile();
     return NextResponse.json(rsvps);
   } catch (err) {
     console.error('RSVP GET error:', err);
@@ -52,18 +85,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid attending value' }, { status: 400 });
     }
 
-    const rsvps = await readRsvps();
+    const numGuests = Math.max(0, Math.min(5, Number(numberOfGuests) || 0));
+    const guestNameTrimmed = String(guestName).trim();
+    const additionalTrimmed = String(additionalGuests ?? '').trim();
+    const dietaryTrimmed = String(dietaryRestrictions ?? '').trim();
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const { data, error } = await supabase
+        .from('rsvps')
+        .insert({
+          guest_name: guestNameTrimmed,
+          attending,
+          number_of_guests: numGuests,
+          additional_guests: additionalTrimmed,
+          dietary_restrictions: dietaryTrimmed,
+        })
+        .select('id, guest_name, attending, number_of_guests, additional_guests, dietary_restrictions, created_at')
+        .single();
+      if (error) {
+        console.error('RSVP POST Supabase error:', error);
+        return NextResponse.json({ error: 'Failed to save RSVP' }, { status: 500 });
+      }
+      return NextResponse.json(rowToEntry(data));
+    }
+
+    const rsvps = await readRsvpsFile();
     const newEntry: RSVPEntryStored = {
       id: Date.now().toString(),
-      guestName: String(guestName).trim(),
+      guestName: guestNameTrimmed,
       attending,
-      numberOfGuests: Math.max(0, Math.min(5, Number(numberOfGuests) || 0)),
-      additionalGuests: String(additionalGuests ?? '').trim(),
-      dietaryRestrictions: String(dietaryRestrictions ?? '').trim(),
+      numberOfGuests: numGuests,
+      additionalGuests: additionalTrimmed,
+      dietaryRestrictions: dietaryTrimmed,
       createdAt: new Date().toISOString(),
     };
     rsvps.push(newEntry);
-    await writeRsvps(rsvps);
+    await writeRsvpsFile(rsvps);
     return NextResponse.json(newEntry);
   } catch (err) {
     console.error('RSVP POST error:', err);
@@ -77,12 +135,23 @@ export async function DELETE(request: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
     }
-    const rsvps = await readRsvps();
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const { error } = await supabase.from('rsvps').delete().eq('id', id);
+      if (error) {
+        console.error('RSVP DELETE Supabase error:', error);
+        return NextResponse.json({ error: 'Failed to delete RSVP' }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    const rsvps = await readRsvpsFile();
     const filtered = rsvps.filter((r) => r.id !== id);
     if (filtered.length === rsvps.length) {
       return NextResponse.json({ error: 'RSVP not found' }, { status: 404 });
     }
-    await writeRsvps(filtered);
+    await writeRsvpsFile(filtered);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('RSVP DELETE error:', err);

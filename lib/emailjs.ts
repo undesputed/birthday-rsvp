@@ -5,7 +5,6 @@ export interface RSVPEmailParams {
   attending: string;
   numberOfGuests: number;
   additionalGuests: string;
-  dietaryRestrictions: string;
 }
 
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
@@ -28,7 +27,6 @@ export async function sendRSVPNotification(params: RSVPEmailParams): Promise<voi
     attending: params.attending,
     numberOfGuests: String(params.numberOfGuests),
     additionalGuests: params.additionalGuests || '(none)',
-    dietaryRestrictions: params.dietaryRestrictions || '(none)',
     ...(FROM_NAME && { from_name: FROM_NAME }),
     ...(TO_EMAIL && {
       to_email: TO_EMAIL.split(',').map((e) => e.trim()).filter(Boolean).join(','),

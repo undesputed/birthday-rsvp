@@ -14,6 +14,7 @@ A single-page birthday invitation site with RSVP form, event details, photo gall
 - **Next.js 16** (App Router), **React 19**, **TypeScript**
 - **Tailwind CSS**, **shadcn/ui** (Radix)
 - **EmailJS** – client-side email for RSVP notifications
+- **Supabase** – RSVP storage when deployed (e.g. Vercel); optional locally (uses a JSON file)
 - **pnpm** – package manager
 
 ## Getting Started
@@ -56,10 +57,23 @@ Create `.env.local` from `.env.example` and set:
 | `NEXT_PUBLIC_EMAILJS_TEMPLATE_ID` | EmailJS template ID for RSVP emails |
 | `NEXT_PUBLIC_EMAILJS_TO_EMAIL` | Where to receive RSVPs (comma-separated for multiple) |
 | `NEXT_PUBLIC_EMAILJS_FROM_NAME` | Sender name shown on notification emails |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (required for Vercel; optional for local) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (Project Settings → API) |
 
 Get the first three from [EmailJS Dashboard](https://dashboard.emailjs.com/) after creating an account, connecting an email service (e.g. Gmail), and creating a template. Use the variables `{{guestName}}`, `{{attending}}`, `{{numberOfGuests}}`, `{{additionalGuests}}`, `{{dietaryRestrictions}}`, `{{to_email}}`, and `{{from_name}}` in your template.
 
 A ready-made HTML template (design matches this site) is in `docs/emailjs-rsvp-template.html`.
+
+### Supabase (for Vercel / serverless)
+
+On Vercel the app cannot write to the filesystem, so RSVP storage uses **Supabase** when configured:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the Supabase dashboard, open **SQL Editor** and run the script in `docs/supabase-rsvps-table.sql` to create the `rsvps` table.
+3. In **Project Settings → API**, copy the **Project URL** and **service_role** key (keep the key secret).
+4. In Vercel (or `.env.local`), set `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+
+If these are not set, the API falls back to file storage (`data/rsvps.json`), which works locally but **fails on Vercel** (500 when saving RSVP).
 
 ## Scripts
 
@@ -80,7 +94,7 @@ app/
     page.tsx      # RSVP dashboard
   api/
     rsvp/
-      route.ts    # GET/POST/DELETE RSVPs (file-based storage)
+      route.ts    # GET/POST/DELETE RSVPs (Supabase on Vercel, file locally)
 components/
   hero-section.tsx
   event-details.tsx
@@ -89,20 +103,22 @@ components/
   navigation-bar.tsx
   ui/             # shadcn components
 lib/
-  rsvp-store.ts   # RSVP type + legacy in-memory (admin/form use API)
+  rsvp-store.ts   # RSVP type (admin/form use API)
   emailjs.ts      # EmailJS send helper
+  supabase-server.ts  # Supabase admin client for API routes
   utils.ts
 data/
-  rsvps.json      # Created at runtime; RSVPs persisted here (gitignored)
+  rsvps.json      # Used only when Supabase is not set (local; gitignored)
 public/
   logo.png        # Favicon / branding
   *.jpg           # Gallery images
 docs/
   emailjs-rsvp-template.html   # EmailJS template (copy into dashboard)
+  supabase-rsvps-table.sql     # Run in Supabase SQL Editor to create rsvps table
 ```
 
 ## Notes
 
-- **RSVP data** is stored in `data/rsvps.json` on the server so it persists across refreshes and is shared across all devices. The file is created automatically when the first RSVP is submitted. On serverless hosts (e.g. Vercel) the filesystem may be read-only; for production there you’d switch to a database (e.g. Vercel KV, Supabase).
+- **RSVP storage**: With Supabase env vars set (required on Vercel), RSVPs are stored in Supabase. Without them (e.g. local only), the API uses `data/rsvps.json`, which does not work on Vercel.
 - **Gallery images** live in `public/`. Replace the JPGs there to change the gallery; the component uses all images in that folder except placeholders (see `components/photo-gallery.tsx`).
 - **Admin** at `/admin` has no authentication. Restrict access (e.g. via hosting or middleware) if the site is public.
