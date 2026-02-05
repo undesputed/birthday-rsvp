@@ -114,12 +114,6 @@ export default function AdminPage() {
                   <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-foreground">
                     Status
                   </th>
-                  <th className="hidden sm:table-cell px-2 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-foreground">
-                    Additional Guests
-                  </th>
-                  <th className="hidden md:table-cell px-2 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-foreground">
-                    Dietary Notes
-                  </th>
                   <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-foreground">
                     Action
                   </th>
@@ -145,13 +139,12 @@ export default function AdminPage() {
                           {rsvp.attending}
                         </span>
                       </td>
-                      <td className="hidden sm:table-cell px-2 sm:px-6 py-3 sm:py-4 text-foreground/80 text-xs sm:text-base">
+                      <td className="hidden sm:table-cell px-2 sm:px-6 py-3 sm:py-4 text-foreground/80 text-xs sm:text-base whitespace-pre-wrap break-words max-w-xs">
                         {rsvp.attending === 'yes' && rsvp.numberOfGuests > 0
-                          ? `${rsvp.numberOfGuests} guest${rsvp.numberOfGuests !== 1 ? 's' : ''}`
+                          ? rsvp.additionalGuests && rsvp.additionalGuests.trim().length > 0
+                            ? `${rsvp.numberOfGuests} guest${rsvp.numberOfGuests !== 1 ? 's' : ''}: ${rsvp.additionalGuests}`
+                            : `${rsvp.numberOfGuests} guest${rsvp.numberOfGuests !== 1 ? 's' : ''}`
                           : '—'}
-                      </td>
-                      <td className="hidden md:table-cell px-2 sm:px-6 py-3 sm:py-4 text-foreground/80 max-w-xs truncate text-xs sm:text-base">
-                        {rsvp.dietaryRestrictions || '—'}
                       </td>
                       <td className="px-2 sm:px-6 py-3 sm:py-4">
                         <Button
