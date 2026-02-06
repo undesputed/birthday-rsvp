@@ -4,6 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { RSVPEntry } from '@/lib/rsvp-store';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 function computeSummary(rsvps: RSVPEntry[]) {
   return {
@@ -15,10 +26,28 @@ function computeSummary(rsvps: RSVPEntry[]) {
   };
 }
 
+type UpdateFormState = {
+  guestName: string;
+  attending: 'yes' | 'no' | 'maybe';
+  numberOfGuests: number;
+  additionalGuests: string;
+  dietaryRestrictions: string;
+};
+
 export default function AdminPage() {
   const [rsvps, setRsvps] = useState<RSVPEntry[]>([]);
   const [summary, setSummary] = useState(computeSummary([]));
   const [error, setError] = useState<string | null>(null);
+  const [editingRsvp, setEditingRsvp] = useState<RSVPEntry | null>(null);
+  const [updateForm, setUpdateForm] = useState<UpdateFormState>({
+    guestName: '',
+    attending: 'yes',
+    numberOfGuests: 0,
+    additionalGuests: '',
+    dietaryRestrictions: '',
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const fetchRsvps = useCallback(async () => {
     try {
@@ -52,6 +81,62 @@ export default function AdminPage() {
     } catch {
       setError('Failed to delete RSVP');
     }
+  };
+
+  const openUpdateDialog = (rsvp: RSVPEntry) => {
+    setUpdateError(null);
+    setEditingRsvp(rsvp);
+    setUpdateForm({
+      guestName: rsvp.guestName,
+      attending: rsvp.attending,
+      numberOfGuests: rsvp.numberOfGuests ?? 0,
+      additionalGuests: rsvp.additionalGuests ?? '',
+      dietaryRestrictions: rsvp.dietaryRestrictions ?? '',
+    });
+  };
+
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRsvp) return;
+    if (!updateForm.guestName.trim()) {
+      setUpdateError('Name is required');
+      return;
+    }
+    setUpdateError(null);
+    setIsUpdating(true);
+    try {
+      const res = await fetch(`/api/rsvp?id=${encodeURIComponent(editingRsvp.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestName: updateForm.guestName.trim(),
+          attending: updateForm.attending,
+          numberOfGuests: updateForm.numberOfGuests,
+          additionalGuests: updateForm.additionalGuests,
+          dietaryRestrictions: updateForm.dietaryRestrictions,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? 'Failed to update');
+      }
+      await fetchRsvps();
+      setEditingRsvp(null);
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : 'Failed to update RSVP');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdateFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setUpdateForm((prev) => ({
+      ...prev,
+      [name]: name === 'numberOfGuests' ? Math.max(0, Math.min(5, parseInt(value, 10) || 0)) : value,
+    }));
   };
 
   const getAttendingBadgeColor = (attending: string) => {
@@ -115,6 +200,9 @@ export default function AdminPage() {
                     Status
                   </th>
                   <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-foreground">
+                    Additional Guests
+                  </th>
+                  <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold text-foreground">
                     Action
                   </th>
                 </tr>
@@ -147,13 +235,22 @@ export default function AdminPage() {
                           : '—'}
                       </td>
                       <td className="px-2 sm:px-6 py-3 sm:py-4">
-                        <Button
-                          onClick={() => handleDelete(rsvp.id)}
-                          variant="ghost"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-100 text-xs sm:text-base py-1 sm:py-2 px-2 sm:px-3"
-                        >
-                          Delete
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                          <Button
+                            onClick={() => openUpdateDialog(rsvp)}
+                            variant="ghost"
+                            className="text-primary hover:text-primary/90 hover:bg-primary/10 text-xs sm:text-base py-1 sm:py-2 px-2 sm:px-3"
+                          >
+                            Update
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(rsvp.id)}
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-100 text-xs sm:text-base py-1 sm:py-2 px-2 sm:px-3"
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -162,6 +259,107 @@ export default function AdminPage() {
             </table>
           </div>
         </Card>
+
+        {/* Update RSVP Dialog */}
+        <Dialog open={!!editingRsvp} onOpenChange={(open) => !open && setEditingRsvp(null)}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Update RSVP</DialogTitle>
+              <DialogDescription>
+                Edit the guest details below and save to update this RSVP.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdateSubmit} className="space-y-4">
+              {updateError && (
+                <div className="p-3 bg-red-100 border border-red-400 text-red-800 rounded-lg text-sm">
+                  {updateError}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="edit-guestName">Name *</Label>
+                <Input
+                  id="edit-guestName"
+                  name="guestName"
+                  value={updateForm.guestName}
+                  onChange={handleUpdateFormChange}
+                  placeholder="Guest name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Attending</Label>
+                <div className="flex flex-wrap gap-3">
+                  {(['yes', 'no', 'maybe'] as const).map((value) => (
+                    <label key={value} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="attending"
+                        value={value}
+                        checked={updateForm.attending === value}
+                        onChange={handleUpdateFormChange}
+                        className="rounded border-input accent-primary"
+                      />
+                      <span className="text-sm font-medium capitalize">{value}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-numberOfGuests">Additional guests</Label>
+                <select
+                  id="edit-numberOfGuests"
+                  name="numberOfGuests"
+                  value={updateForm.numberOfGuests}
+                  onChange={handleUpdateFormChange}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {[0, 1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n} {n === 1 ? 'guest' : 'guests'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-additionalGuests">Names of additional guests</Label>
+                <Textarea
+                  id="edit-additionalGuests"
+                  name="additionalGuests"
+                  value={updateForm.additionalGuests}
+                  onChange={handleUpdateFormChange}
+                  placeholder="One per line"
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-dietaryRestrictions">Dietary restrictions</Label>
+                <Textarea
+                  id="edit-dietaryRestrictions"
+                  name="dietaryRestrictions"
+                  value={updateForm.dietaryRestrictions}
+                  onChange={handleUpdateFormChange}
+                  placeholder="Optional"
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingRsvp(null)}
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isUpdating}>
+                  {isUpdating ? 'Saving…' : 'Save changes'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   );

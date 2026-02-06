@@ -129,6 +129,68 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const id = request.nextUrl.searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+    const body = await request.json();
+    const { guestName, attending, numberOfGuests, additionalGuests, dietaryRestrictions } = body;
+
+    const updates: {
+      guest_name?: string;
+      attending?: 'yes' | 'no' | 'maybe';
+      number_of_guests?: number;
+      additional_guests?: string;
+      dietary_restrictions?: string;
+    } = {};
+    if (typeof guestName === 'string' && guestName.trim()) updates.guest_name = guestName.trim();
+    if (['yes', 'no', 'maybe'].includes(attending)) updates.attending = attending;
+    if (typeof numberOfGuests === 'number' || (typeof numberOfGuests === 'string' && numberOfGuests !== ''))
+      updates.number_of_guests = Math.max(0, Math.min(5, Number(numberOfGuests) || 0));
+    if (additionalGuests !== undefined) updates.additional_guests = String(additionalGuests ?? '').trim();
+    if (dietaryRestrictions !== undefined) updates.dietary_restrictions = String(dietaryRestrictions ?? '').trim();
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
+    if (isSupabaseConfigured()) {
+      const supabase = getSupabaseAdmin()!;
+      const { data, error } = await supabase
+        .from('rsvps')
+        .update(updates)
+        .eq('id', id)
+        .select('id, guest_name, attending, number_of_guests, additional_guests, dietary_restrictions, created_at')
+        .single();
+      if (error) {
+        console.error('RSVP PATCH Supabase error:', error);
+        return NextResponse.json({ error: 'Failed to update RSVP' }, { status: 500 });
+      }
+      return NextResponse.json(rowToEntry(data));
+    }
+
+    const rsvps = await readRsvpsFile();
+    const index = rsvps.findIndex((r) => r.id === id);
+    if (index === -1) return NextResponse.json({ error: 'RSVP not found' }, { status: 404 });
+    const current = rsvps[index];
+    rsvps[index] = {
+      ...current,
+      ...(updates.guest_name !== undefined && { guestName: updates.guest_name }),
+      ...(updates.attending !== undefined && { attending: updates.attending }),
+      ...(updates.number_of_guests !== undefined && { numberOfGuests: updates.number_of_guests }),
+      ...(updates.additional_guests !== undefined && { additionalGuests: updates.additional_guests }),
+      ...(updates.dietary_restrictions !== undefined && { dietaryRestrictions: updates.dietary_restrictions }),
+    };
+    await writeRsvpsFile(rsvps);
+    return NextResponse.json(rsvps[index]);
+  } catch (err) {
+    console.error('RSVP PATCH error:', err);
+    return NextResponse.json({ error: 'Failed to update RSVP' }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const id = request.nextUrl.searchParams.get('id');

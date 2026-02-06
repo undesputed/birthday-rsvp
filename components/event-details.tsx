@@ -1,4 +1,4 @@
-import { MapPin, Clock, Gift, Utensils, Music, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, Calendar, Gift, Utensils, Music, AlertCircle } from 'lucide-react';
 
 export function EventDetails() {
   return (
@@ -35,15 +35,18 @@ export function EventDetails() {
             </div>
           </div>
 
-          {/* Time Card */}
+          {/* Date & Time Card */}
           <div className="bg-gradient-to-br from-accent/20 to-primary/10 rounded-lg sm:rounded-2xl p-4 sm:p-8 border-2 sm:border-3 border-accent/30 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
             <div className="flex items-start gap-3 sm:gap-4">
               <div className="bg-accent text-accent-foreground p-2 sm:p-4 rounded-lg sm:rounded-xl flex-shrink-0 shadow-lg">
-                <Clock className="w-5 sm:w-8 h-5 sm:h-8" />
+                <Calendar className="w-5 sm:w-8 h-5 sm:h-8" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-lg sm:text-xl text-foreground mb-1 sm:mb-2">Time</h3>
+                <h3 className="font-bold text-lg sm:text-xl text-foreground mb-1 sm:mb-2">Date & Time</h3>
                 <p className="text-foreground/80 font-semibold text-sm sm:text-lg">
+                  Feb 12, 2026
+                </p>
+                <p className="text-foreground/80 font-semibold text-sm sm:text-lg mt-1">
                   7:00 PM - 9:00 PM
                 </p>
                 <p className="text-foreground/70 text-xs sm:text-sm mt-1">

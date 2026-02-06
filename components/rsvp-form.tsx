@@ -103,7 +103,7 @@ export function RSVPForm() {
           Let us know if you can make it to the celebration!
         </p>
         <p className="text-center text-foreground/80 font-semibold mb-2 text-sm sm:text-base">
-          Please RSVP by February 11.
+          Please RSVP before February 12.
         </p>
         <div className="flex justify-center gap-2 sm:gap-3 mb-6 sm:mb-10 text-2xl sm:text-3xl">
           🐻 ✨ 🎈
